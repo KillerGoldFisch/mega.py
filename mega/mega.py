@@ -129,45 +129,22 @@ class Mega(object):
         Process a file
         """
         if file['t'] == 0 or file['t'] == 1:
-            keys = dict(keypart.split(':', 1) for keypart in file['k'].split('/') if ':' in keypart)
-            uid = file['u']
-            key = None
-            # my objects
-            if uid in keys:
-                key = decrypt_key(base64_to_a32(keys[uid]), self.master_key)
-            # shared folders 
-            elif 'su' in file and 'sk' in file and ':' in file['k']:
-                shared_key = decrypt_key(base64_to_a32(file['sk']), self.master_key)
-                key = decrypt_key(base64_to_a32(keys[file['h']]), shared_key)
-                if file['su'] not in shared_keys:
-                    shared_keys[file['su']] = {}
-                shared_keys[file['su']][file['h']] = shared_key
-            # shared files
-            elif file['u'] and file['u'] in shared_keys:
-                for hkey in shared_keys[file['u']]:
-                    shared_key = shared_keys[file['u']][hkey]
-                    if hkey in keys:
-                        key = keys[hkey]
-                        key = decrypt_key(base64_to_a32(key), shared_key)
-                        break
-            if key is not None:
-                # file
-                if file['t'] == 0:
-                    k = (key[0] ^ key[4], key[1] ^ key[5], key[2] ^ key[6],
-                         key[3] ^ key[7])
-                    file['iv'] = key[4:6] + (0, 0)
-                    file['meta_mac'] = key[6:8]
-                # folder
-                else:
-                    k = key
-                file['key'] = key
-                file['k'] = k
-                attributes = base64_url_decode(file['a'])
-                attributes = decrypt_attr(attributes, k)
-                file['a'] = attributes
-            # other => wrong object
-            elif file['k'] == '':
-                file['a'] = False
+            key = file['k'].split(':')[1]
+            key = decrypt_key(base64_to_a32(key), self.master_key)
+            # file
+            if file['t'] == 0:
+                k = (key[0] ^ key[4],
+                     key[1] ^ key[5],
+                     key[2] ^ key[6],
+                     key[3] ^ key[7])
+            # directory
+            else:
+                k = key
+            attributes = base64urldecode(file['a'])
+            attributes = decrypt_attr(attributes, k)
+            file['a'] = attributes
+            file['k'] = key
+
         elif file['t'] == 2:
             self.root_id = file['h']
             file['a'] = {'n': 'Cloud Drive'}
